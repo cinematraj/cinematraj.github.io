@@ -40,11 +40,6 @@
     .venue { font-size: 19px; color: var(--muted); margin: 4px 0 14px; }
     .authors { font-size: 19px; margin: 8px 0 2px; }
     .affil { color: var(--muted); font-size: 15.5px; margin-bottom: 20px; }
-    .anon-note {
-      display: inline-block; background: var(--bg-soft); border: 1px solid var(--border);
-      border-radius: 8px; padding: 6px 14px; font-size: 14.5px; color: var(--muted);
-      margin-bottom: 22px;
-    }
     .btn-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 10px; }
     .btn {
       display: inline-flex; align-items: center; gap: 7px;
@@ -148,9 +143,15 @@
   <header>
     <div class="container">
       <h1><span class="model">CinemaTraj</span>: Composing Atomic Camera Trajectories for 3D&nbsp;Scenes with LLM&nbsp;Agents</h1>
-      <p class="venue">Under review at ACM Multimedia 2026</p>
-      <p class="authors">Anonymous Author(s)</p>
-      <p class="anon-note">This project page is anonymized for double-blind review.</p>
+      <p class="venue">ACM Multimedia 2026</p>
+      <p class="authors">
+        Qianru Li<sup>1,2*</sup>, Xuyang Chen<sup>1,2*</sup>, Erkin Turkoz<sup>2</sup>, Xuqin Wang<sup>2</sup>,
+        Tao Wu<sup>2</sup>, Lu Liu<sup>2</sup>, Yanfeng Zhang<sup>2</sup>
+      </p>
+      <p class="affil">
+        <sup>1</sup>Technical University of Munich &nbsp;&nbsp; <sup>2</sup>Huawei Hilbert Research Center (Dresden)<br>
+        <sup>*</sup>Equal contribution
+      </p>
       <div class="btn-row">
         <span class="btn disabled"><span class="icon">&#128196;</span> Paper (coming soon)</span>
         <span class="btn disabled"><span class="icon">&#128220;</span> arXiv (coming soon)</span>
@@ -493,10 +494,10 @@
   <section id="bibtex">
     <div class="container">
       <h2>BibTeX</h2>
-      <pre class="bibtex">@inproceedings{cinematraj2026,
+      <pre class="bibtex">@inproceedings{li2026cinematraj,
   title     = {CinemaTraj: Composing Atomic Camera Trajectories for 3D Scenes with LLM Agents},
-  author    = {Anonymous Author(s)},
-  booktitle = {Under review at ACM Multimedia},
+  author    = {Li, Qianru and Chen, Xuyang and Turkoz, Erkin and Wang, Xuqin and Wu, Tao and Liu, Lu and Zhang, Yanfeng},
+  booktitle = {Proceedings of the 34th ACM International Conference on Multimedia (MM '26)},
   year      = {2026}
 }</pre>
     </div>
@@ -504,8 +505,7 @@
 
   <footer>
     <div class="container">
-      <p>Project page for an anonymous submission under double-blind review at ACM Multimedia 2026.<br>
-      Scenes from <a href="https://kaldir.vc.in.tum.de/scannetpp/" target="_blank" rel="noopener">ScanNet++</a>; all videos are rendered from 3D Gaussian Splatting reconstructions.</p>
+      <p>Scenes from <a href="https://kaldir.vc.in.tum.de/scannetpp/" target="_blank" rel="noopener">ScanNet++</a>; all videos are rendered from 3D Gaussian Splatting reconstructions.</p>
     </div>
   </footer>
 

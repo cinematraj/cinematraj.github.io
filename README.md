@@ -1,7 +1,8 @@
 # CinemaTraj — Project Page
 
-Project page for the anonymous ACM Multimedia 2026 submission
-**"CinemaTraj: Composing Atomic Camera Trajectories for 3D Scenes with LLM Agents"**.
+Project page for the ACM Multimedia 2026 paper
+**"CinemaTraj: Composing Atomic Camera Trajectories for 3D Scenes with LLM Agents"**,
+served at [cinematraj.github.io](https://cinematraj.github.io).
 
 This is a static site served with GitHub Pages; `index.html` is the entire page.
 
@@ -15,8 +16,3 @@ This is a static site served with GitHub Pages; `index.html` is the entire page.
 
 Videos are H.264-re-encoded (880 px wide, CRF 26) from the original renders for web delivery.
 Each video shows the rendered walkthrough on top and a bird's-eye trajectory visualization below.
-
-## Note on anonymity
-
-The page is anonymized for double-blind review. Keep commits, the hosting account, and the
-LICENSE free of identifying information until the review process concludes.
