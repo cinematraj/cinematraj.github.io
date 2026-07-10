@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CinemaTraj: Composing Atomic Camera Trajectories for 3D Scenes with LLM Agents</title>
+  <meta name="description" content="CinemaTraj reframes camera trajectory planning as a language-grounded spatial reasoning problem: an LLM agent equipped with a 3D scene graph composes atomic cinematographic movements into collision-free, narrated cinematic videos.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Noto+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --text: #1f2430;
+      --muted: #5f6572;
+      --accent: #2f6fdb;
+      --mv: #c62828;        /* camera movements */
+      --ob: #2e7d32;        /* target objects */
+      --bg-soft: #f5f7fa;
+      --border: #e3e7ee;
+      --ours: #2f6fdb;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: 'Noto Sans', 'Segoe UI', system-ui, sans-serif;
+      color: var(--text);
+      background: #ffffff;
+      line-height: 1.6;
+      font-size: 17px;
+    }
+    h1, h2, h3, h4 { font-family: 'Google Sans', 'Noto Sans', sans-serif; line-height: 1.25; }
+    .container { max-width: 1000px; margin: 0 auto; padding: 0 20px; }
+    .container.wide { max-width: 1280px; }
+
+    /* ---------- header ---------- */
+    header { padding: 56px 0 8px; text-align: center; }
+    header h1 { font-size: clamp(26px, 4vw, 40px); margin: 0 0 6px; font-weight: 700; }
+    header h1 .model { color: var(--accent); }
+    .venue { font-size: 19px; color: var(--muted); margin: 4px 0 14px; }
+    .authors { font-size: 19px; margin: 8px 0 2px; }
+    .affil { color: var(--muted); font-size: 15.5px; margin-bottom: 20px; }
+    .anon-note {
+      display: inline-block; background: var(--bg-soft); border: 1px solid var(--border);
+      border-radius: 8px; padding: 6px 14px; font-size: 14.5px; color: var(--muted);
+      margin-bottom: 22px;
+    }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 10px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: #22252c; color: #fff; border-radius: 999px;
+      padding: 8px 18px; font-size: 15px; text-decoration: none;
+      font-family: 'Google Sans', sans-serif; transition: background .15s ease;
+    }
+    .btn:hover { background: #3a3f4a; }
+    .btn.disabled { background: #9aa1ad; cursor: default; }
+    .btn.disabled:hover { background: #9aa1ad; }
+    .btn .icon { font-size: 16px; line-height: 1; }
+
+    /* ---------- sections ---------- */
+    section { padding: 34px 0 10px; }
+    section h2 {
+      font-size: clamp(22px, 3vw, 30px); text-align: center; margin: 6px 0 22px;
+    }
+    section h3 { font-size: 21px; margin: 26px 0 10px; }
+    .fig { margin: 0; text-align: center; }
+    .fig img { max-width: 100%; height: auto; border-radius: 10px; }
+    .fig figcaption {
+      font-size: 15px; color: var(--muted); text-align: left;
+      max-width: 900px; margin: 12px auto 0;
+    }
+    .fig figcaption b { color: var(--text); }
+    .abstract-text { text-align: justify; hyphens: auto; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 34px auto 0; max-width: 1000px; }
+
+    /* ---------- prompt boxes ---------- */
+    .prompt {
+      background: var(--bg-soft); border: 1px solid var(--border); border-radius: 10px;
+      padding: 14px 18px; font-size: 16.5px; margin: 0 0 16px;
+    }
+    .prompt .tag {
+      display: inline-block; font-size: 12.5px; font-weight: 700; letter-spacing: .4px;
+      text-transform: uppercase; color: var(--muted); margin-right: 8px;
+    }
+    .mv { color: var(--mv); font-weight: 600; }
+    .ob { color: var(--ob); font-weight: 600; }
+    .legend { text-align: center; font-size: 14.5px; color: var(--muted); margin: -6px 0 24px; }
+
+    /* ---------- video grids ---------- */
+    .scene { margin: 0 0 44px; }
+    .scene h3 { text-align: left; margin-top: 0; }
+    .scene h3 .scene-id { color: var(--muted); font-weight: 400; font-size: 15px; }
+    .vgrid { display: grid; gap: 14px; }
+    .vgrid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .vgrid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+    .vcell { text-align: center; }
+    .vcell video {
+      width: 100%; height: auto; border-radius: 10px; display: block;
+      background: #000; border: 1px solid var(--border);
+    }
+    .vcell.ours video { border: 2px solid var(--ours); }
+    .vlabel { font-size: 15px; margin-top: 8px; color: var(--text); font-weight: 600; }
+    .vcell.ours .vlabel { color: var(--ours); }
+    .vlabel small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; }
+    @media (max-width: 900px) {
+      .vgrid.cols-3, .vgrid.cols-4 { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 520px) {
+      .vgrid.cols-3, .vgrid.cols-4 { grid-template-columns: 1fr; }
+    }
+
+    /* ---------- tables ---------- */
+    .tablewrap { overflow-x: auto; margin: 8px 0 6px; }
+    table.results {
+      border-collapse: collapse; margin: 0 auto; font-size: 15.5px; min-width: 640px;
+    }
+    table.results caption {
+      caption-side: top; font-size: 15px; color: var(--muted); padding-bottom: 10px; text-align: center;
+    }
+    table.results th, table.results td { padding: 7px 14px; text-align: center; }
+    table.results thead th { border-bottom: 2px solid var(--text); font-family: 'Google Sans', sans-serif; }
+    table.results tbody tr.sep td { border-top: 1px solid var(--border); }
+    table.results tbody tr:first-child td { border-top: none; }
+    table.results td:first-child, table.results th:first-child { text-align: left; }
+    table.results tbody tr.ours { background: #eef4fd; }
+    table.results tbody tr.ours td { font-weight: 600; color: var(--ours); }
+    table.results tfoot td { border-top: 2px solid var(--text); }
+    .best { font-weight: 700; }
+    .second { text-decoration: underline; text-underline-offset: 3px; }
+    .arrow { font-size: 12px; color: var(--muted); }
+
+    /* ---------- bibtex ---------- */
+    pre.bibtex {
+      background: var(--bg-soft); border: 1px solid var(--border); border-radius: 10px;
+      padding: 18px 20px; font-size: 14px; overflow-x: auto; line-height: 1.5;
+    }
+
+    footer {
+      margin-top: 50px; padding: 26px 0 34px; border-top: 1px solid var(--border);
+      font-size: 14px; color: var(--muted); text-align: center;
+    }
+    footer a { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+  <!-- ===================== Header ===================== -->
+  <header>
+    <div class="container">
+      <h1><span class="model">CinemaTraj</span>: Composing Atomic Camera Trajectories for 3D&nbsp;Scenes with LLM&nbsp;Agents</h1>
+      <p class="venue">Under review at ACM Multimedia 2026</p>
+      <p class="authors">Anonymous Author(s)</p>
+      <p class="anon-note">This project page is anonymized for double-blind review.</p>
+      <div class="btn-row">
+        <span class="btn disabled"><span class="icon">&#128196;</span> Paper (coming soon)</span>
+        <span class="btn disabled"><span class="icon">&#128220;</span> arXiv (coming soon)</span>
+        <span class="btn disabled"><span class="icon">&#128187;</span> Code (coming soon)</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================== Teaser ===================== -->
+  <section>
+    <div class="container">
+      <figure class="fig">
+        <img src="static/images/teaser.jpg" alt="CinemaTraj teaser: from a 3D scene and a natural language prompt, an LLM agent plans a collision-free camera trajectory and renders a narrated cinematic video.">
+        <figcaption>
+          Given a 3D scene and a natural language prompt (<i>left</i>), <b>CinemaTraj</b> decomposes the request into a
+          sequence of cinematographic movements — orbit, crane, zoom-in — grounded in a 3D scene graph, and plans a
+          collision-free camera trajectory through the scene (<i>middle</i>). The resulting trajectory is rendered into a
+          cinematic video with synchronized voiceover and subtitles (<i>right</i>).
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ===================== Abstract ===================== -->
+  <section id="abstract">
+    <div class="container">
+      <h2>Abstract</h2>
+      <p class="abstract-text">
+        Automatically generating cinematically expressive camera trajectories through 3D scenes from natural language
+        descriptions is a challenging task of high practical value, with applications ranging from real-estate
+        advertising to virtual tour creation. Existing methods either lack true 3D spatial awareness by relying on 2D
+        image priors, or treat trajectory generation as a geometric path planning problem divorced from cinematographic
+        semantics. We present <b>CinemaTraj</b>, a framework that reframes camera trajectory planning as a
+        language-grounded spatial reasoning problem. Given a set of RGB-D images and a user prompt, CinemaTraj equips an
+        LLM agent with a structured 3D scene graph: the agent decomposes the prompt into a sequence of atomic
+        cinematographic movements (dolly, orbit, crane, pan, tilt, zoom, arc). Each movement is instantiated via a novel
+        parametric trajectory representation that is both cinematographically expressive and optimizable for collision
+        avoidance. The scene graph acts as a structured spatial prior, grounding the agent's reasoning in accurate
+        geometric and semantic knowledge of the environment. CinemaTraj further generates synchronized voiceover and
+        subtitles aligned with camera motion, producing narrated cinematic video outputs. We evaluate CinemaTraj on
+        real-world ScanNet++ environments, and show that it produces prompt-faithful, collision-free trajectories with
+        high cinematographic quality, outperforming existing approaches on prompt alignment, trajectory quality, and
+        safety metrics.
+      </p>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ===================== Method ===================== -->
+  <section id="method">
+    <div class="container">
+      <h2>Method</h2>
+      <figure class="fig">
+        <img src="static/images/pipeline.png" alt="CinemaTraj pipeline: Scene Graph Extractor, User Prompt Translator, Parametric Atomic Trajectory Builder, and Collision and Occlusion-Free Trajectory Optimizer.">
+        <figcaption>
+          <b>Pipeline overview.</b> (1) The <b>Scene Graph Extractor</b> builds a cinematography-oriented scene graph
+          from RGB-D frames, retaining room–object containment and object–structure relations that govern movement
+          feasibility. (2) The <b>User Prompt Translator</b> gives an LLM agent the scene graph and a cinematographic
+          toolset, translating the prompt into a sequence of atomic trajectory commands. (3) The <b>Parametric Atomic
+          Trajectory Builder</b> selects a score-based anchor viewpoint per object and instantiates each command through
+          an interpretable parametric representation. (4) The <b>Collision &amp; Occlusion-Free Trajectory Optimizer</b>
+          refines the free parameters by gradient descent on a signed distance field, avoiding obstacles and occlusions
+          while preserving shot style — an orbit remains an orbit, even in cluttered scenes.
+        </figcaption>
+      </figure>
+
+      <figure class="fig" style="margin-top:36px;">
+        <img src="static/images/camera_movements_all.png" alt="Gallery of atomic camera movements: full/half/quarter orbits, pans, dolly in/out, crane, tilts, zooms, static hold, and the transitional arc." style="max-width:720px;">
+        <figcaption>
+          <b>Atomic cinematographic movements.</b> The parametric shot vocabulary: object-centric movements
+          (orbit full/half/quarter, pan, dolly in/out, crane, tilt, optical zoom, static hold) and the transitional
+          <i>arc</i> connecting consecutive targets. Frustum color encodes temporal progression (blue &rarr; red). The
+          toolset is extensible — new trajectory types can be added without changing the rest of the pipeline.
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ===================== Comparison videos ===================== -->
+  <section id="comparisons">
+    <div class="container wide">
+      <h2>Baseline Comparisons</h2>
+      <p class="legend">
+        Prompts are color-coded: <span class="mv">camera movements</span> and <span class="ob">target objects</span>.
+        Each video shows the rendered walkthrough (<i>top</i>) and a bird's-eye visualization of the executed camera
+        trajectory over the scene reconstruction (<i>bottom</i>). Videos play automatically when scrolled into view.
+      </p>
+
+      <div class="scene">
+        <h3>Scene 1 <span class="scene-id">&mdash; ScanNet++ <code>09c1414f1b</code></span></h3>
+        <p class="prompt"><span class="tag">Prompt</span>
+          &ldquo;I'd like a specific sequence: First, do an <span class="mv">orbit around</span> the <span class="ob">table</span>,
+          then do a <span class="mv">crane shot</span> on the <span class="ob">sofa</span>, then <span class="mv">zoom in</span>
+          the <span class="ob">bicycle</span>, then <span class="mv">pan right</span> toward the <span class="ob">refrigerator</span>,
+          and finally do a <span class="mv">static view</span> of the <span class="ob">sink</span>.&rdquo;</p>
+        <div class="vgrid cols-3">
+          <div class="vcell ours">
+            <video muted loop playsinline preload="none" controls poster="static/posters/comparison/09c1414f1b_cinematraj.jpg">
+              <source src="static/videos/comparison/09c1414f1b_cinematraj.mp4" type="video/mp4"></video>
+            <div class="vlabel">CinemaTraj (Ours)</div>
+          </div>
+          <div class="vcell">
+            <video muted loop playsinline preload="none" controls poster="static/posters/comparison/09c1414f1b_chatcam_gendop.jpg">
+              <source src="static/videos/comparison/09c1414f1b_chatcam_gendop.mp4" type="video/mp4"></video>
+            <div class="vlabel">ChatCam + GenDoP</div>
+          </div>
+          <div class="vcell">
+            <video muted loop playsinline preload="none" controls poster="static/posters/comparison/09c1414f1b_cctg.jpg">
+              <source src="static/videos/comparison/09c1414f1b_cctg.mp4" type="video/mp4"></video>
+            <div class="vlabel">CCTG</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scene">
+        <h3>Scene 2 <span class="scene-id">&mdash; ScanNet++ <code>0cf2e9402d</code></span></h3>
+        <p class="prompt"><span class="tag">Prompt</span>
+          &ldquo;First, do a <span class="mv">quarter orbit</span> around the <span class="ob">microwave</span>, then
+          <span class="mv">move in</span> toward the <span class="ob">refrigerator</span>, then <span class="mv">pan left</span>
+          from the <span class="ob">washing machine</span>, and finally <span class="mv">tilt down</span> from the
+          <span class="ob">kitchen counter</span>.&rdquo;</p>
+        <div class="vgrid cols-3">
+          <div class="vcell ours">
+            <video muted loop playsinline preload="none" controls poster="static/posters/comparison/0cf2e9402d_cinematraj.jpg">
+              <source src="static/videos/comparison/0cf2e9402d_cinematraj.mp4" type="video/mp4"></video>
+            <div class="vlabel">CinemaTraj (Ours)</div>
+          </div>
+          <div class="vcell">
+            <video muted loop playsinline preload="none" controls poster="static/posters/comparison/0cf2e9402d_chatcam_gendop.jpg">
+              <source src="static/videos/comparison/0cf2e9402d_chatcam_gendop.mp4" type="video/mp4"></video>
+            <div class="vlabel">ChatCam + GenDoP</div>
+          </div>
+          <div class="vcell">
+            <video muted loop playsinline preload="none" controls poster="static/posters/comparison/0cf2e9402d_cctg.jpg">
+              <source src="static/videos/comparison/0cf2e9402d_cctg.mp4" type="video/mp4"></video>
+            <div class="vlabel">CCTG</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scene">
+        <h3>Scene 3 <span class="scene-id">&mdash; ScanNet++ <code>2c7c10379b</code></span></h3>
+        <p class="prompt"><span class="tag">Prompt</span>
+          &ldquo;Here's what I want: First, <span class="mv">move in</span> to the <span class="ob">sofa</span>, then do a
+          <span class="mv">360 degrees orbit</span> around the <span class="ob">table</span>, then <span class="mv">zoom in</span>
+          toward the <span class="ob">PC</span>, then do a <span class="mv">crane shot</span> of the <span class="ob">bed</span>,
+          and finally do a <span class="mv">tilt down</span> to the <span class="ob">chair</span>.&rdquo;</p>
+        <div class="vgrid cols-3">
+          <div class="vcell ours">
+            <video muted loop playsinline preload="none" controls poster="static/posters/comparison/2c7c10379b_cinematraj.jpg">
+              <source src="static/videos/comparison/2c7c10379b_cinematraj.mp4" type="video/mp4"></video>
+            <div class="vlabel">CinemaTraj (Ours)</div>
+          </div>
+          <div class="vcell">
+            <video muted loop playsinline preload="none" controls poster="static/posters/comparison/2c7c10379b_chatcam_gendop.jpg">
+              <source src="static/videos/comparison/2c7c10379b_chatcam_gendop.mp4" type="video/mp4"></video>
+            <div class="vlabel">ChatCam + GenDoP</div>
+          </div>
+          <div class="vcell">
+            <video muted loop playsinline preload="none" controls poster="static/posters/comparison/2c7c10379b_cctg.jpg">
+              <source src="static/videos/comparison/2c7c10379b_cctg.mp4" type="video/mp4"></video>
+            <div class="vlabel">CCTG</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ===================== Ablation videos ===================== -->
+  <section id="ablations">
+    <div class="container wide">
+      <h2>Ablation Study</h2>
+      <p class="legend">
+        Removing the <b>Anchor Selector</b> leads to incorrect object targeting; removing <b>parametric trajectories</b>
+        yields unstructured paths; removing <b>SDF-based optimization</b> causes geometry collisions.
+      </p>
+
+      <div class="scene">
+        <h3>Scene 1 <span class="scene-id">&mdash; ScanNet++ <code>09c1414f1b</code></span></h3>
+        <div class="vgrid cols-4">
+          <div class="vcell ours">
+            <video muted loop playsinline preload="none" controls poster="static/posters/comparison/09c1414f1b_cinematraj.jpg">
+              <source src="static/videos/comparison/09c1414f1b_cinematraj.mp4" type="video/mp4"></video>
+            <div class="vlabel">Full Model (Ours)</div>
+          </div>
+          <div class="vcell">
+            <video muted loop playsinline preload="none" controls poster="static/posters/ablation/09c1414f1b_no_anchor.jpg">
+              <source src="static/videos/ablation/09c1414f1b_no_anchor.mp4" type="video/mp4"></video>
+            <div class="vlabel">w/o Anchor Selector<small>CLIP-based anchor selection</small></div>
+          </div>
+          <div class="vcell">
+            <video muted loop playsinline preload="none" controls poster="static/posters/ablation/09c1414f1b_no_parametric.jpg">
+              <source src="static/videos/ablation/09c1414f1b_no_parametric.mp4" type="video/mp4"></video>
+            <div class="vlabel">w/o Parametric Traj.<small>direct 6-DoF generation</small></div>
+          </div>
+          <div class="vcell">
+            <video muted loop playsinline preload="none" controls poster="static/posters/ablation/09c1414f1b_no_sdf.jpg">
+              <source src="static/videos/ablation/09c1414f1b_no_sdf.mp4" type="video/mp4"></video>
+            <div class="vlabel">w/o SDF-based Opt.<small>3DGS density field fallback</small></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scene">
+        <h3>Scene 2 <span class="scene-id">&mdash; ScanNet++ <code>0cf2e9402d</code></span></h3>
+        <div class="vgrid cols-4">
+          <div class="vcell ours">
+            <video muted loop playsinline preload="none" controls poster="static/posters/comparison/0cf2e9402d_cinematraj.jpg">
+              <source src="static/videos/comparison/0cf2e9402d_cinematraj.mp4" type="video/mp4"></video>
+            <div class="vlabel">Full Model (Ours)</div>
+          </div>
+          <div class="vcell">
+            <video muted loop playsinline preload="none" controls poster="static/posters/ablation/0cf2e9402d_no_anchor.jpg">
+              <source src="static/videos/ablation/0cf2e9402d_no_anchor.mp4" type="video/mp4"></video>
+            <div class="vlabel">w/o Anchor Selector<small>CLIP-based anchor selection</small></div>
+          </div>
+          <div class="vcell">
+            <video muted loop playsinline preload="none" controls poster="static/posters/ablation/0cf2e9402d_no_parametric.jpg">
+              <source src="static/videos/ablation/0cf2e9402d_no_parametric.mp4" type="video/mp4"></video>
+            <div class="vlabel">w/o Parametric Traj.<small>direct 6-DoF generation</small></div>
+          </div>
+          <div class="vcell">
+            <video muted loop playsinline preload="none" controls poster="static/posters/ablation/0cf2e9402d_no_sdf.jpg">
+              <source src="static/videos/ablation/0cf2e9402d_no_sdf.mp4" type="video/mp4"></video>
+            <div class="vlabel">w/o SDF-based Opt.<small>3DGS density field fallback</small></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="scene">
+        <h3>Scene 3 <span class="scene-id">&mdash; ScanNet++ <code>2c7c10379b</code></span></h3>
+        <div class="vgrid cols-4">
+          <div class="vcell ours">
+            <video muted loop playsinline preload="none" controls poster="static/posters/comparison/2c7c10379b_cinematraj.jpg">
+              <source src="static/videos/comparison/2c7c10379b_cinematraj.mp4" type="video/mp4"></video>
+            <div class="vlabel">Full Model (Ours)</div>
+          </div>
+          <div class="vcell">
+            <video muted loop playsinline preload="none" controls poster="static/posters/ablation/2c7c10379b_no_anchor.jpg">
+              <source src="static/videos/ablation/2c7c10379b_no_anchor.mp4" type="video/mp4"></video>
+            <div class="vlabel">w/o Anchor Selector<small>CLIP-based anchor selection</small></div>
+          </div>
+          <div class="vcell">
+            <video muted loop playsinline preload="none" controls poster="static/posters/ablation/2c7c10379b_no_parametric.jpg">
+              <source src="static/videos/ablation/2c7c10379b_no_parametric.mp4" type="video/mp4"></video>
+            <div class="vlabel">w/o Parametric Traj.<small>direct 6-DoF generation</small></div>
+          </div>
+          <div class="vcell">
+            <video muted loop playsinline preload="none" controls poster="static/posters/ablation/2c7c10379b_no_sdf.jpg">
+              <source src="static/videos/ablation/2c7c10379b_no_sdf.mp4" type="video/mp4"></video>
+            <div class="vlabel">w/o SDF-based Opt.<small>3DGS density field fallback</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ===================== Open-ended ===================== -->
+  <section id="open-ended">
+    <div class="container">
+      <h2>Open-Ended Prompts</h2>
+      <figure class="fig">
+        <img src="static/images/open_ended.jpg" alt="Open-ended prompt results: planned trajectories over four scene reconstructions with numbered keyframes along each tour.">
+        <figcaption>
+          <b>End-to-end planning from an abstract request.</b> For the open-ended prompt
+          <i>&ldquo;Can you give an incoming Airbnb guest a detailed walkthrough of this house?&rdquo;</i>, CinemaTraj
+          autonomously selects salient objects, orders the visits, and composes atomic movements into a full tour.
+          Left: planned trajectories over the scene reconstruction; right: keyframes at the numbered anchors.
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ===================== Quantitative results ===================== -->
+  <section id="results">
+    <div class="container">
+      <h2>Quantitative Results</h2>
+
+      <div class="tablewrap">
+        <table class="results">
+          <caption><b>Comparison and ablation</b> on 50 ScanNet++ scenes with fully-specified prompts.
+            Best in <span class="best">bold</span>, second best <span class="second">underlined</span>.</caption>
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Motion MSE <span class="arrow">&darr;</span></th>
+              <th>CLaTr Score <span class="arrow">&uarr;</span></th>
+              <th>Collision Rate <span class="arrow">&darr;</span></th>
+              <th>Occlusion Rate <span class="arrow">&darr;</span></th>
+              <th>Coverage <span class="arrow">&uarr;</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>ChatCam + GenDoP</td><td>7.741</td><td>19.461</td><td>0.209</td><td>0.580</td><td>0.661</td></tr>
+            <tr><td>CCTG</td><td>9.143</td><td>24.031</td><td class="second">0.035</td><td>0.516</td><td>0.700</td></tr>
+            <tr class="sep"><td>w/o Anchor Selector</td><td>7.055</td><td class="second">28.538</td><td class="best">0.023</td><td>0.579</td><td class="second">0.882</td></tr>
+            <tr><td>w/o Parametric Traj.</td><td>2.843</td><td>26.243</td><td>0.081</td><td class="best">0.460</td><td class="best">1.000</td></tr>
+            <tr><td>w/o SDF-based Opt.</td><td class="second">1.841</td><td>25.900</td><td>0.557</td><td>0.566</td><td class="best">1.000</td></tr>
+            <tr class="ours sep"><td>CinemaTraj (Ours)</td><td class="best">1.741</td><td class="best">28.982</td><td>0.056</td><td class="second">0.503</td><td class="best">1.000</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tablewrap" style="margin-top:34px;">
+        <table class="results">
+          <caption><b>User study</b> — 40 participants rate videos from all methods across 4 scenes on a 5-point Likert scale.</caption>
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Prompt Alignment <span class="arrow">&uarr;</span></th>
+              <th>Collision &amp; Occlusion Avoidance <span class="arrow">&uarr;</span></th>
+              <th>Cinematographic Quality <span class="arrow">&uarr;</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>ChatCam + GenDoP</td><td>2.00</td><td>1.97</td><td>2.08</td></tr>
+            <tr><td>CCTG</td><td>2.38</td><td>2.93</td><td>2.16</td></tr>
+            <tr class="sep"><td>w/o Anchor Selector</td><td class="second">3.03</td><td class="second">3.63</td><td class="second">3.24</td></tr>
+            <tr><td>w/o Parametric Traj.</td><td>2.89</td><td>3.40</td><td>2.14</td></tr>
+            <tr><td>w/o SDF-based Opt.</td><td>3.17</td><td>2.01</td><td>2.60</td></tr>
+            <tr class="ours sep"><td>CinemaTraj (Ours)</td><td class="best">4.62</td><td class="best">4.56</td><td class="best">4.36</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ===================== BibTeX ===================== -->
+  <section id="bibtex">
+    <div class="container">
+      <h2>BibTeX</h2>
+      <pre class="bibtex">@inproceedings{cinematraj2026,
+  title     = {CinemaTraj: Composing Atomic Camera Trajectories for 3D Scenes with LLM Agents},
+  author    = {Anonymous Author(s)},
+  booktitle = {Under review at ACM Multimedia},
+  year      = {2026}
+}</pre>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>Project page for an anonymous submission under double-blind review at ACM Multimedia 2026.<br>
+      Scenes from <a href="https://kaldir.vc.in.tum.de/scannetpp/" target="_blank" rel="noopener">ScanNet++</a>; all videos are rendered from 3D Gaussian Splatting reconstructions.</p>
+    </div>
+  </footer>
+
+  <script>
+    // Auto play/pause muted videos as they enter/leave the viewport.
+    document.addEventListener('DOMContentLoaded', function () {
+      var videos = document.querySelectorAll('video');
+      if (!('IntersectionObserver' in window)) return;
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          var v = e.target;
+          if (e.isIntersecting) {
+            v.play().catch(function () {});
+          } else {
+            v.pause();
+          }
+        });
+      }, { threshold: 0.25 });
+      videos.forEach(function (v) { io.observe(v); });
+    });
+  </script>
+</body>
+</html>
